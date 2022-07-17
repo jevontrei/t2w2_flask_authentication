@@ -1,6 +1,9 @@
 from flask import Flask, jsonify
 app = Flask(__name__)
 
+from flask_marshmallow import Marshmallow
+ma = Marshmallow(app)
+
 from flask_sqlalchemy import SQLAlchemy 
 # set the database URI via SQLAlchemy, 
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql+psycopg2://db_dev:123456@localhost:5432/trello_clone_db"
@@ -63,9 +66,26 @@ class Card(db.Model):
     status = db.Column(db.String())
     priority = db.Column(db.String())
 
+#create the Card Schema with Marshmallow, it will provide the serialization needed for converting the data into JSON
+class CardSchema(ma.Schema):
+    class Meta:
+        # Fields to expose
+        fields = ("id", "title", "description", "date", "status", "priority")
 
+#single card schema, when one card needs to be retrieved
+card_schema = CardSchema()
+#multiple card schema, when many cards need to be retrieved
+cards_schema = CardSchema(many=True)
 
 @app.route("/")
 def hello():
   return "Hello World!"
 
+@app.route("/cards", methods=["GET"])
+def get_cards():
+    # get all the cards from the database table
+    cards_list = Card.query.all()
+    # Convert the cards from the database into a JSON format and store them in result
+    result = cards_schema.dump(cards_list)
+    # return the data in JSON format
+    return jsonify(result)
