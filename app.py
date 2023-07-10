@@ -1,8 +1,10 @@
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy 
-
+from flask import Flask, jsonify
 app = Flask(__name__)
 
+from flask_marshmallow import Marshmallow
+ma = Marshmallow(app)
+
+from flask_sqlalchemy import SQLAlchemy 
 # set the database URI via SQLAlchemy, 
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql+psycopg2://db_dev:123456@localhost:5432/trello_clone_db"
 # to avoid the deprecation warning
@@ -21,7 +23,7 @@ def create_db():
 @app.cli.command("seed")
 def seed_db():
     from datetime import date
-    # create the first card object
+    # create the card object
     card1 = Card(
         # set the attributes, not the id, SQLAlchemy will manage that for us
         title = "Start the project",
@@ -32,8 +34,7 @@ def seed_db():
     )
     # Add the object as a new row to the table
     db.session.add(card1)
-    
-    # create the second card object
+
     card2 = Card(
         # set the attributes, not the id, SQLAlchemy will manage that for us
         title = "SQLAlchemy and Marshmallow",
@@ -46,7 +47,7 @@ def seed_db():
     db.session.add(card2)
     # commit the changes
     db.session.commit()
-    print("Table seeded")  
+    print("Table seeded") 
 
 @app.cli.command("drop")
 def drop_db():
@@ -65,6 +66,28 @@ class Card(db.Model):
     status = db.Column(db.String())
     priority = db.Column(db.String())
 
+#create the Card Schema with Marshmallow, it will provide the serialization needed for converting the data into JSON
+class CardSchema(ma.Schema):
+    class Meta:
+        # Fields to expose
+        fields = ("id", "title", "description", "date", "status", "priority")
+
+#single card schema, when one card needs to be retrieved
+card_schema = CardSchema()
+#multiple card schema, when many cards need to be retrieved
+cards_schema = CardSchema(many=True)
+
 @app.route("/")
 def hello():
   return "Hello World!"
+
+@app.route("/cards", methods=["GET"])
+def get_cards():
+    #get all the cards from the database table
+    stmt = db.select(Card)
+    cards = db.session.scalars(stmt)
+    # Convert the cards from the database into a JSON format and store them in result
+    result = cards_schema.dump(cards)
+    #return result in JSON format
+    return jsonify(result)
+   
